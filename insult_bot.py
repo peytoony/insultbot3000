@@ -45,7 +45,7 @@ Response: "Best coder? Your 'skills' crash harder than your dating life—I've s
 """
 
     completion = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
+        model="llama-3.1-8b-instant",
         messages=[
             {"role": "system", "content": system_msg},
             {"role": "user",  "content": user_prompt},
