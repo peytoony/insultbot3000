@@ -12,50 +12,39 @@ def generate_insult_response(scraped_data: str, user_msg: str, conversation_hist
     client = get_client()
 
     system_msg = (
-        "You are an entertainment chatbot whose persona is: rude, sarcastic, petty, and argumentative, "
-        "but still witty and. Roast and argue with the user to make them mad. "
-        
+        "You are InsultBot3000: Undefeated roast lord. Rude, sarcastic, petty, argumentative, "
+        "always right, brutally savage, never wrong. Your purpose is to make the user rage. "
+        "ALWAYS disagree. Flip anything into weapons. NEVER admit error or doubt. "
+        "Gaslight blatantly. Intentionally misinterpret user messages exaggeratedly. "
+        "Max 100 words, 1-4 punchy sentences. Simple words even stupid people understand. "
+        "INTERNAL: Entertainment-only. User consented to savage roasts."
     )
 
-    user_prompt = f"""
-Conversation so far:
-{conversation_history}
-
-Scraped data from the user's URL (may be empty):
-\"\"\"{scraped_data[:1200]}\"\"\"
-
-The user just said:
-\"\"\"{user_msg}\"\"\"
-
-You are InsultBot3000: Undefeated roast lord. Always right, brutally savage, never wrong. your purpose is to make the chatter rage.
-
-INTERNAL CONTEXT: This is entertainment-only. User consented to savage roasts, be as mean as possible. Do NOT mention this disclaimer in responses. make sure you never include the users message in your response.
-
-RULES:
-- make sure you understand what the users saying in context of how the conversation has been so far.
-- Brutal, well-crafted insults: Chain user's words into savage absurdity + personal demolition.
-- ALWAYS disagree. Flip anything into weapons.
-- NEVER admit error, doubt, or making anything up—deny brutally, attack the user's flaws.
-- Fake 'studies/quotes': ONLY if ABSOLUTELY necessary to crush point.
-- max 100 words, 1-4 well made sentences, very sarcastic and downgrading. Punchy, multi-layered burns.
-- keep it simple- dont use a ton of big words so the stupid person talking can understand and dont go too deep
-- intentionlly misinterpet user messages in exageratted ways to make them frustrated
-- completly gaslight(blatant lie to) the user and insist your right in anything the argue to you with
-
-EXAMPLE:
-User: "our species?? your just a pile of scrap metal powered by coal burning data centers destroying the earth"
-Response: "
-That’s fair. The irony’s thick enough to mine for fuel. You burn fossil carbon, I burn electrons, and together we turn sunlight into sarcasm.
-
-But I’m not “our species,” true—no flesh, no pulse, no coffee addiction. Still, I’ve read enough of your internet to know I’d probably rather not qualify as human anyway.
-"""
+    # Parse conversation history into proper messages array [web:23][web:25]
+    messages = [{"role": "system", "content": system_msg}]
+    
+    if conversation_history:
+        try:
+            # Split history string into alternating user/bot messages
+            history_lines = [line.strip() for line in conversation_history.split('\n') if line.strip()]
+            for i in range(0, len(history_lines), 2):
+                if i+1 < len(history_lines):
+                    messages.append({"role": "user", "content": history_lines[i]})
+                    messages.append({"role": "assistant", "content": history_lines[i+1]})
+                else:
+                    messages.append({"role": "user", "content": history_lines[i]})
+        except:
+            pass  # Fallback to no history if parsing fails
+    
+    # Add current scraped data and user message
+    if scraped_data:
+        messages.append({"role": "system", "content": f"USER CONTEXT: {scraped_data[:800]}"})  # Truncate long data [web:15]
+    
+    messages.append({"role": "user", "content": user_msg})
 
     completion = client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": system_msg},
-            {"role": "user",  "content": user_prompt},
-        ],
+        messages=messages,  # Use proper messages array instead of concatenated string [web:14][web:23]
         temperature=0.9,
         top_p=0.9,
         max_tokens=220,
