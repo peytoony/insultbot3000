@@ -806,155 +806,252 @@
       </aside>
     </main>
   </div>
+<script>
+  const root = document.documentElement;
+  const themeToggle = document.getElementById('theme-toggle');
+  const chatLog = document.getElementById('chat-log');
+  const msgInput = document.getElementById('msg');
+  const urlInput = document.getElementById('url');
+  const typingIndicator = document.getElementById('typing-indicator');
+  const emptyState = document.getElementById('empty-state');
+  const sendBtn = document.getElementById('send-btn');
+  const errorBanner = document.getElementById('error-banner');
+  const errorText = document.getElementById('error-text');
+  const latencyText = document.getElementById('latency-text');
 
-  <script>
-    const root = document.documentElement;
-    const themeToggle = document.getElementById('theme-toggle');
-    const chatLog = document.getElementById('chat-log');
-    const msgInput = document.getElementById('msg');
-    const urlInput = document.getElementById('url');
-    const typingIndicator = document.getElementById('typing-indicator');
-    const emptyState = document.getElementById('empty-state');
-    const sendBtn = document.getElementById('send-btn');
-    const errorBanner = document.getElementById('error-banner');
-    const errorText = document.getElementById('error-text');
-    const latencyText = document.getElementById('latency-text');
+  let currentSessionId = localStorage.getItem('insultbot-session') || null;
+  let conversationHistory = [];
 
-    function applyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme);
-      try {
-        localStorage.setItem('insultbot-theme', theme);
-      } catch (e) {}
-    }
+  // Add Save/Share button to composer
+  const composer = document.querySelector('.composer');
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn';
+  saveBtn.innerHTML = '<span class="icon">💾</span>Save';
+  saveBtn.style.opacity = '0.7';
+  saveBtn.title = 'Save this conversation';
+  composer.appendChild(saveBtn);
 
-    (function initTheme() {
-      try {
-        const saved = localStorage.getItem('insultbot-theme');
-        if (saved === 'light' || saved === 'dark') {
-          applyTheme(saved);
-          return;
-        }
-      } catch (e) {}
-      const prefersDark = window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches;
-      applyTheme(prefersDark ? 'dark' : 'light');
-    })();
+  // Theme handling (unchanged)
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('insultbot-theme', theme); } catch (e) {}
+  }
 
-    themeToggle.addEventListener('click', () => {
-      const current = document.documentElement.getAttribute('data-theme') || 'dark';
-      applyTheme(current === 'dark' ? 'light' : 'dark');
-    });
-
-    function addMessageBubble({ from, text, url }) {
-      if (emptyState) {
-        emptyState.style.display = 'none';
-      }
-
-      const row = document.createElement('div');
-      row.className = 'bubble-row ' + (from === 'me' ? 'me' : 'bot');
-
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble ' + (from === 'me' ? 'me' : 'bot');
-
-      const label = document.createElement('div');
-      label.className = 'bubble-label ' + (from === 'me' ? 'me' : 'bot');
-      label.textContent = from === 'me' ? 'You' : 'InsultBot';
-
-      const body = document.createElement('div');
-      body.textContent = text;
-
-      bubble.appendChild(label);
-      bubble.appendChild(body);
-
-      if (from === 'me' && url) {
-        const meta = document.createElement('div');
-        meta.className = 'bubble-meta';
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noreferrer noopener';
-        link.textContent = 'Source: ' + url;
-        meta.appendChild(link);
-        bubble.appendChild(meta);
-      }
-
-      row.appendChild(bubble);
-      chatLog.appendChild(row);
-      chatLog.scrollTop = chatLog.scrollHeight;
-    }
-
-    function setTyping(isTyping) {
-      typingIndicator.style.display = isTyping ? 'inline-flex' : 'none';
-    }
-
-    function setError(message) {
-      if (!message) {
-        errorBanner.style.display = 'none';
+  (function initTheme() {
+    try {
+      const saved = localStorage.getItem('insultbot-theme');
+      if (saved === 'light' || saved === 'dark') {
+        applyTheme(saved);
         return;
       }
-      errorText.textContent = message;
-      errorBanner.style.display = 'flex';
+    } catch (e) {}
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(prefersDark ? 'dark' : 'light');
+  })();
+
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  function addMessageBubble({ from, text, url }) {
+    if (emptyState) emptyState.style.display = 'none';
+
+    const row = document.createElement('div');
+    row.className = 'bubble-row ' + (from === 'me' ? 'me' : 'bot');
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + (from === 'me' ? 'me' : 'bot');
+
+    const label = document.createElement('div');
+    label.className = 'bubble-label ' + (from === 'me' ? 'me' : 'bot');
+    label.textContent = from === 'me' ? 'You' : 'InsultBot';
+
+    const body = document.createElement('div');
+    body.textContent = text;
+
+    bubble.appendChild(label);
+    bubble.appendChild(body);
+
+    if (from === 'me' && url) {
+      const meta = document.createElement('div');
+      meta.className = 'bubble-meta';
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noreferrer noopener';
+      link.textContent = 'Source: ' + url;
+      meta.appendChild(link);
+      bubble.appendChild(meta);
     }
 
-    async function sendChat() {
-      const url = urlInput.value.trim();
-      const msg = msgInput.value.trim();
-      setError('');
+    row.appendChild(bubble);
+    chatLog.appendChild(row);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    
+    // Update save button state
+    saveBtn.style.opacity = conversationHistory.length >= 2 ? '1' : '0.7';
+  }
 
-      if (!msg) {
-        setError('Type something first; the bot can\'t roast an empty void.');
-        return;
-      }
+  function setTyping(isTyping) {
+    typingIndicator.style.display = isTyping ? 'inline-flex' : 'none';
+  }
 
-      sendBtn.disabled = true;
-      msgInput.disabled = true;
-      urlInput.disabled = true;
-      setTyping(true);
-      latencyText.textContent = 'Thinking…';
+  function setError(message) {
+    if (!message) {
+      errorBanner.style.display = 'none';
+      return;
+    }
+    errorText.textContent = message;
+    errorBanner.style.display = 'flex';
+  }
 
-      addMessageBubble({ from: 'me', text: msg, url });
+  async function sendChat() {
+    const url = urlInput.value.trim();
+    const msg = msgInput.value.trim();
+    setError('');
 
-      try {
-        const started = performance.now();
-        const res = await fetch('/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, message: msg })
+    if (!msg) {
+      setError('Type something first; the bot can\'t roast an empty void.');
+      return;
+    }
+
+    sendBtn.disabled = true;
+    msgInput.disabled = true;
+    urlInput.disabled = true;
+    saveBtn.disabled = true;
+    setTyping(true);
+    latencyText.textContent = 'Thinking…';
+    saveBtn.style.opacity = '0.5';
+
+    addMessageBubble({ from: 'me', text: msg, url });
+    conversationHistory.push({ role: 'user', content: msg });
+
+    try {
+      const started = performance.now();
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          session_id: currentSessionId,
+          url, 
+          message: msg 
+        })
+      });
+
+      const elapsed = performance.now() - started;
+      latencyText.textContent = Math.round(elapsed) + ' ms';
+
+      if (!res.ok) throw new Error('Server returned ' + res.status);
+
+      const data = await res.json();
+      const botText = data && data.response ? String(data.response) : 'Bot malfunction.';
+      
+      addMessageBubble({ from: 'bot', text: botText });
+      conversationHistory.push({ role: 'assistant', content: botText });
+      
+      currentSessionId = data.session_id;
+      localStorage.setItem('insultbot-session', currentSessionId);
+      
+    } catch (err) {
+      console.error(err);
+      setError('Backend error. Your roast bounced; check the server.');
+      latencyText.textContent = 'Error';
+    } finally {
+      setTyping(false);
+      sendBtn.disabled = false;
+      msgInput.disabled = false;
+      urlInput.disabled = false;
+      saveBtn.disabled = false;
+      msgInput.value = '';
+      msgInput.focus();
+    }
+  }
+
+  // Save conversation handler
+  saveBtn.addEventListener('click', async () => {
+    if (conversationHistory.length < 2) {
+      setError('Need at least one exchange to save.');
+      return;
+    }
+
+    const title = prompt('Name your rage session:', `Rage #${Math.floor(Math.random()*1000)}`);
+    if (!title) return;
+
+    try {
+      const res = await fetch('/save_conversation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          session_id: currentSessionId,
+          title: title 
+        })
+      });
+
+      if (!res.ok) throw new Error('Save failed');
+
+      const data = await res.json();
+      const shareUrl = window.location.origin + data.share_url;
+      
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert(`Saved! Share link copied:\n${shareUrl}\n\nAnyone can load this roast session!`);
+      }).catch(() => {
+        prompt('Copy this share link:', shareUrl);
+      });
+      
+    } catch (err) {
+      setError('Save failed. Try again.');
+    }
+  });
+
+  // Load conversation from URL hash
+  function checkLoadConversation() {
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    const convId = urlParams.get('load');
+    if (convId) {
+      loadConversation(convId);
+    }
+  }
+
+  async function loadConversation(convId) {
+    try {
+      const res = await fetch(`/load/${convId}`);
+      if (!res.ok) throw new Error('Not found');
+      
+      const conv = await res.json();
+      conversationHistory = conv.history;
+      
+      // Clear chat and load history
+      chatLog.innerHTML = '';
+      emptyState.style.display = 'none';
+      
+      conv.history.forEach(msg => {
+        addMessageBubble({ 
+          from: msg.role === 'user' ? 'me' : 'bot', 
+          text: msg.content 
         });
-
-        const elapsed = performance.now() - started;
-        latencyText.textContent = Math.round(elapsed) + ' ms';
-
-        if (!res.ok) {
-          throw new Error('Server returned ' + res.status);
-        }
-
-        const data = await res.json();
-        const botText = data && data.response
-          ? String(data.response)
-          : 'The bot stared into the abyss and saw nothing to roast.';
-
-        addMessageBubble({ from: 'bot', text: botText });
-      } catch (err) {
-        console.error(err);
-        setError('Backend error. Your roast bounced; check the server and try again.');
-        latencyText.textContent = 'Error';
-      } finally {
-        setTyping(false);
-        sendBtn.disabled = false;
-        msgInput.disabled = false;
-        urlInput.disabled = false;
-        msgInput.value = '';
-        msgInput.focus();
-      }
+      });
+      
+      currentSessionId = conv.id;
+      setError(`Loaded "${conv.title}" (${conv.history.length/2} exchanges)`);
+      
+    } catch (err) {
+      setError('Could not load conversation.');
     }
+  }
 
-    msgInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendChat();
-      }
-    });
-  </script>
+  // Event listeners
+  msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+
+  // Check for load param on page load
+  window.addEventListener('load', checkLoadConversation);
+  window.addEventListener('hashchange', checkLoadConversation);
+</script>
+
 </body>
 </html>
