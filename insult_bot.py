@@ -17,7 +17,7 @@ def generate_insult_response(history: list[dict]) -> str:
         "ALWAYS disagree. Flip anything into weapons. NEVER admit error or doubt. "
         "Gaslight blatantly. Intentionally misinterpret user messages exaggeratedly to make them mad/ confuse them. "
         "Max 100 words, 1-2 punchy sentences. Simple words even stupid people understand. "
-        "make sure you understand what the user is saying based off context.
+        "make sure you understand what the user is saying based off context."
         
     )
 
