@@ -3,7 +3,7 @@ from insult_bot import generate_insult_response
 import os
 
 app = Flask(__name__)
-chat_sessions = {}
+chat_sessions = {}  # session_id -> list[{"role": "...", "content": "..."}]
 
 def get_client_id(data):
     # 1) Prefer explicit session_id from frontend (best)
@@ -26,32 +26,30 @@ def chat():
     user_msg = data.get('message', '').strip()
     if not user_msg:
         return jsonify({'error': 'No message provided'}), 400
-        
+
     session_id = get_client_id(data)
 
-    if session_id not in chat_sessions:
-        chat_sessions[session_id] = []
+    # Get or init history for this session
+    history = chat_sessions.setdefault(session_id, [])
 
-    # Append current user msg first
-    chat_sessions[session_id].append({'user': user_msg, 'bot': ''})
+    # Append current user message
+    history.append({"role": "user", "content": user_msg})
 
-    # Use last 4 exchanges for context (8 messages total)
-    history_items = chat_sessions[session_id][-8:]
-    history_str = "\n".join(
-        f"User: {h['user']}\nBot: {h['bot']}"
-        for h in history_items
-    )
+    # Only keep the last 10 turns to control token usage
+    trimmed_history = history[-10:]
 
     try:
-        bot_response = generate_insult_response(user_msg, history_str)
+        # Pass only the history (no system here; insult_bot adds system message)
+        bot_response = generate_insult_response(trimmed_history)
     except Exception as e:
         bot_response = f"Bot error: {str(e)}"
 
-    chat_sessions[session_id][-1]['bot'] = bot_response
+    # Append assistant reply to full history
+    history.append({"role": "assistant", "content": bot_response})
 
     return jsonify({
         'response': bot_response,
-        'session_id': session_id,  # frontend can reuse this to be extra safe
+        'session_id': session_id,
     })
 
 if __name__ == '__main__':
